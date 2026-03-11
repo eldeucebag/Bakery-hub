@@ -64,12 +64,12 @@ jobs:
     - name: Build Linux
       run: |
         flet build linux --yes
-    
+
     - name: Upload Linux build
       uses: actions/upload-artifact@v4
       with:
         name: linux-build
-        path: dist/
+        path: build/linux/
 
   build-android:
     needs: test
@@ -118,4 +118,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: android-build
-        path: dist/
+        path: build/apk/
