@@ -5,6 +5,8 @@ Connects to a specific community server and displays received announces.
 Targets: Linux and Android
 """
 
+import time
+from datetime import datetime
 import RNS
 import flet as ft
 
@@ -173,9 +175,12 @@ class ReticulumApp:
 
             self.update_status("Reticulum initialized", ft.Colors.GREEN)
 
+            # Create an identity for this destination
+            identity = RNS.Identity()
+
             # Create a destination for receiving announces
             self.destination = RNS.Destination(
-                self.rns,
+                identity,
                 RNS.Destination.IN,
                 RNS.Destination.SINGLE,
                 "reticulum",
@@ -183,11 +188,8 @@ class ReticulumApp:
                 "viewer"
             )
 
-            # Set announce handler
-            self.destination.set_announce_handler(self.handle_announce)
-
-            # Create a client for the community server
-            self.client = RNS.Client(self.rns, "community_viewer")
+            # Register announce handler globally
+            RNS.Transport.register_announce_handler(self.handle_announce)
 
             self.connected = True
             if self.connect_btn:
@@ -198,8 +200,7 @@ class ReticulumApp:
 
             self.update_status(f"Connected to {COMMUNITY_SERVER_HASH[:16]}...", ft.Colors.GREEN)
 
-            # Request initial announces
-            self.request_announces()
+            # Announces will be received automatically via the handler
 
         except Exception as e:
             self.update_status(f"Connection error: {str(e)}", ft.Colors.RED)
@@ -208,8 +209,8 @@ class ReticulumApp:
     def disconnect(self):
         """Disconnect from the server"""
         try:
-            if self.rns:
-                RNS.Reticulum.shutdown()
+            # Deregister announce handler
+            RNS.Transport.deregister_announce_handler(self.handle_announce)
 
             self.connected = False
             if self.connect_btn:
@@ -242,7 +243,7 @@ class ReticulumApp:
             announce_data = {
                 'source': source,
                 'data': data_str if data_str else "(no data)",
-                'time': RNS.timestamp_to_date(RNS.now())
+                'time': datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
             }
 
             self.announce_list.append(announce_data)
@@ -252,14 +253,6 @@ class ReticulumApp:
 
         except Exception as e:
             print(f"Error handling announce: {e}")
-
-    def request_announces(self):
-        """Request announces from the server"""
-        try:
-            dest_hash = bytes.fromhex(COMMUNITY_SERVER_HASH)
-            RNS.request_announce(dest_hash)
-        except Exception as e:
-            print(f"Error requesting announces: {e}")
 
 
 def main(page: ft.Page):
