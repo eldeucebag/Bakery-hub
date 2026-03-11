@@ -38,6 +38,18 @@ jobs:
       with:
         python-version: '3.12'
     
+    - name: Install Linux build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-3-dev \
+          libblkid-dev \
+          liblzma-dev \
+          ninja-build \
+          cmake \
+          clang \
+          pkg-config
+    
     - name: Install Flutter
       uses: subosito/flutter-action@v2
       with:
@@ -93,6 +105,10 @@ jobs:
       run: |
         flutter config --enable-linux-desktop
         flutter precache --android
+    
+    - name: Accept Android licenses
+      run: |
+        yes | flutter doctor --android-licenses || true
     
     - name: Build Android APK
       run: |
