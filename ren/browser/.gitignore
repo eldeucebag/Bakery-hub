@@ -1,5 +1,0 @@
-config/
-__pycache__/
-build/
-dist/
-.ruff_cache/
