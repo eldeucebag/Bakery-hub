@@ -1,0 +1,178 @@
+name: Build Packages
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        type: choice
+        options:
+          - all
+          - linux
+          # - windows
+          - android
+        default: 'all'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: https://git.quad4.io/actions/checkout@a5b3063b1edaa6ba4911c8a1b1d5e1656fba3ea5 # v6.0.1
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev cmake ninja-build clang pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Set up Python
+        uses: https://git.quad4.io/actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry config virtualenvs.create false
+          poetry install --without dev
+
+      - name: Build Linux package
+        run: poetry run flet build linux --no-rich-output
+
+      - name: Upload Linux artifact
+        uses: https://git.quad4.io/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v3.2.1
+        with:
+          name: ren-browser-linux
+          path: build/linux
+
+  # build-windows:
+  #   runs-on: windows-latest
+  #   if: github.ref_type == 'tag' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows'
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: https://git.quad4.io/actions/checkout@a5b3063b1edaa6ba4911c8a1b1d5e1656fba3ea5 # v6.0.1
+  #
+  #     - name: Set up Python
+  #       uses: https://git.quad4.io/actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+  #       with:
+  #         python-version: '3.13'
+  #
+  #     - name: Install Poetry and dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install poetry
+  #         poetry config virtualenvs.create false
+  #         poetry install --without dev
+  #
+  #     - name: Build Windows package
+  #       run: poetry run flet build windows --no-rich-output
+  #       env:
+  #         PYTHONIOENCODING: utf-8
+  #         PYTHONUTF8: 1
+  #
+  #     - name: Upload Windows artifact
+  #       uses: https://git.quad4.io/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v3.2.1
+  #       with:
+  #         name: ren-browser-windows
+  #         path: build/windows
+
+  build-android:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'android'
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: https://git.quad4.io/actions/checkout@a5b3063b1edaa6ba4911c8a1b1d5e1656fba3ea5 # v6.0.1
+
+      - name: Set up JDK
+        uses: https://git.quad4.io/actions/setup-java@f905b4359421f885fd1d195484604c02d27cefed # v5.1.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Android dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang pkg-config
+
+      - name: Set up Python
+        uses: https://git.quad4.io/actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry config virtualenvs.create false
+          poetry install --without dev
+
+      - name: Build Android APK
+        run: poetry run flet build apk --no-rich-output --exclude watchdog
+
+      - name: Upload APK artifact
+        uses: https://git.quad4.io/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v3.2.1
+        with:
+          name: ren-browser-apk
+          path: build/apk
+
+  create-release:
+    needs: [build-linux, build-android]  # build-windows removed
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && !cancelled()
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: https://git.quad4.io/actions/checkout@a5b3063b1edaa6ba4911c8a1b1d5e1656fba3ea5 # v6.0.1
+
+      - name: Download Linux artifact
+        if: needs.build-linux.result == 'success'
+        uses: https://git.quad4.io/actions/download-artifact@10979da4ee3096dd7ca8d9a35c72871335fee704 # v7.0.0
+        with:
+          name: ren-browser-linux
+          path: ./artifacts/linux
+
+      # - name: Download Windows artifact
+      #   if: needs.build-windows.result == 'success'
+      #   uses: https://git.quad4.io/actions/download-artifact@10979da4ee3096dd7ca8d9a35c72871335fee704 # v7.0.0
+      #   with:
+      #     name: ren-browser-windows
+      #     path: ./artifacts/windows
+
+      - name: Download APK artifact
+        if: needs.build-android.result == 'success'
+        uses: https://git.quad4.io/actions/download-artifact@10979da4ee3096dd7ca8d9a35c72871335fee704 # v7.0.0
+        with:
+          name: ren-browser-apk
+          path: ./artifacts/apk
+
+      - name: Create draft release
+        uses: https://git.quad4.io/actions/gitea-release-action@4875285c0950474efb7ca2df55233c51333eeb74 # v1
+        if: github.ref_type == 'tag'
+        with:
+          draft: true
+          files: |
+            ./artifacts/linux/*
+            # ./artifacts/windows/*
+            ./artifacts/apk/*
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Release ${{ github.ref_name }}
+            
+            This release contains:
+            - Linux binary package
+            # - Windows binary package
+            - Android APK package

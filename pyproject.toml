@@ -1,0 +1,27 @@
+[project]
+name = "reticulum-viewer"
+version = "1.0.0"
+description = "A Reticulum community server announce viewer."
+authors = [
+    {name = "eldeucebag"}
+]
+requires-python = ">=3.11"
+dependencies = [
+    "flet (>=0.21.0,<1.0.0)",
+    "reticulum (>=0.5.0,<1.0.0)"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.flet]
+exclude = ["watchdog"]
+
+[tool.flet.android]
+min_sdk_version = 21
+target_sdk_version = 34
+
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
+"android.permission.ACCESS_NETWORK_STATE" = true

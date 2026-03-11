@@ -1,0 +1,62 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        python-version: ['3.13']
+
+    steps:
+      - name: Checkout repository
+        uses: https://git.quad4.io/actions/checkout@a5b3063b1edaa6ba4911c8a1b1d5e1656fba3ea5 # v6.0.1
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: https://git.quad4.io/actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Configure Poetry
+        run: |
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
+
+      - name: Cache Poetry dependencies
+        uses: https://git.quad4.io/actions/cache@c73a5101b01fe7b37f915ec29d972774a4e6fbaf # v5
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run linting with ruff
+        run: |
+          poetry run ruff check ./ren_browser/
+          poetry run ruff check ./tests/
+
+      - name: Run tests with pytest
+        run: |
+          poetry run pytest -v --cov=ren_browser --cov-report=xml --cov-report=term
