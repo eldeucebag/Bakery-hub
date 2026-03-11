@@ -1,0 +1,2 @@
+flet>=0.21.0
+reticulum>=0.5.0
