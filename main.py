@@ -25,7 +25,7 @@ class AnnounceCard(ft.Card):
             content=ft.Column(
                 controls=[
                     ft.Row([
-                        ft.Icon(ft.icons.RADIO, size=16, color=ft.colors.GREEN),
+                        ft.Icon(ft.icons.RADIO, size=16, color=ft.Colors.GREEN),
                         ft.Text(
                             f"Source: {announce_data['source']}",
                             weight=ft.FontWeight.BOLD,
@@ -41,7 +41,7 @@ class AnnounceCard(ft.Card):
                     ft.Text(
                         f"Time: {announce_data['time']}",
                         size=10,
-                        color=ft.colors.GREY_600,
+                        color=ft.Colors.GREY_600,
                         italic=True,
                     ),
                 ],
@@ -70,13 +70,13 @@ class ReticulumApp:
         self.status_text = ft.Text(
             "Initializing Reticulum...",
             weight=ft.FontWeight.BOLD,
-            color=ft.colors.BLUE,
+            color=ft.Colors.BLUE,
         )
 
         self.status_bar = ft.Container(
             content=self.status_text,
             padding=10,
-            bgcolor=ft.colors.SURFACE_VARIANT,
+            bgcolor=ft.Colors.SURFACE_VARIANT,
             border_radius=5,
         )
 
@@ -84,7 +84,7 @@ class ReticulumApp:
         conn_info = ft.Text(
             f"Server: {COMMUNITY_SERVER_HASH[:32]}...:{COMMUNITY_SERVER_PORT}",
             size=11,
-            color=ft.colors.GREY_700,
+            color=ft.Colors.GREY_700,
         )
 
         # Announces list
@@ -125,7 +125,7 @@ class ReticulumApp:
                 ft.Container(
                     content=self.announces_list,
                     expand=True,
-                    border=ft.border.all(1, ft.colors.GREY_400),
+                    border=ft.border.all(1, ft.Colors.GREY_400),
                     border_radius=5,
                 ),
                 button_row,
@@ -134,7 +134,7 @@ class ReticulumApp:
             spacing=10,
         )
 
-    def update_status(self, status, color=ft.colors.BLUE):
+    def update_status(self, status, color=ft.Colors.BLUE):
         """Update the status text"""
         if self.status_text:
             self.status_text.value = status
@@ -154,7 +154,7 @@ class ReticulumApp:
             self.announces_list.controls.clear()
             self.announce_list = []
             self.announces_list.update()
-        self.update_status("Announces cleared", ft.colors.GREEN)
+        self.update_status("Announces cleared", ft.Colors.GREEN)
 
     def toggle_connection(self, e):
         """Toggle connection to server"""
@@ -166,12 +166,12 @@ class ReticulumApp:
     def connect(self):
         """Connect to the community server"""
         try:
-            self.update_status("Initializing Reticulum...", ft.colors.BLUE)
+            self.update_status("Initializing Reticulum...", ft.Colors.BLUE)
 
             # Initialize RNS
             self.rns = RNS.Reticulum()
 
-            self.update_status("Reticulum initialized", ft.colors.GREEN)
+            self.update_status("Reticulum initialized", ft.Colors.GREEN)
 
             # Create a destination for receiving announces
             self.destination = RNS.Destination(
@@ -193,16 +193,16 @@ class ReticulumApp:
             if self.connect_btn:
                 self.connect_btn.text = "Disconnect"
                 self.connect_btn.icon = ft.icons.WIFI_OFF
-                self.connect_btn.bgcolor = ft.colors.RED_200
+                self.connect_btn.bgcolor = ft.Colors.RED_200
                 self.connect_btn.update()
 
-            self.update_status(f"Connected to {COMMUNITY_SERVER_HASH[:16]}...", ft.colors.GREEN)
+            self.update_status(f"Connected to {COMMUNITY_SERVER_HASH[:16]}...", ft.Colors.GREEN)
 
             # Request initial announces
             self.request_announces()
 
         except Exception as e:
-            self.update_status(f"Connection error: {str(e)}", ft.colors.RED)
+            self.update_status(f"Connection error: {str(e)}", ft.Colors.RED)
             self.connected = False
 
     def disconnect(self):
@@ -218,10 +218,10 @@ class ReticulumApp:
                 self.connect_btn.bgcolor = None
                 self.connect_btn.update()
 
-            self.update_status("Disconnected", ft.colors.ORANGE)
+            self.update_status("Disconnected", ft.Colors.ORANGE)
 
         except Exception as e:
-            self.update_status(f"Disconnect error: {str(e)}", ft.colors.RED)
+            self.update_status(f"Disconnect error: {str(e)}", ft.Colors.RED)
 
     def handle_announce(self, path, data, request_id, requested_by, interface_id=None):
         """Handle received announces"""
