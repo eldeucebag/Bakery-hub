@@ -14,3 +14,9 @@ permissions = [
     "INTERNET",
     "ACCESS_NETWORK_STATE"
 ]
+
+[build.packages]
+include = [
+    "RNS",
+    "reticulum"
+]
