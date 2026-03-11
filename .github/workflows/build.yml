@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-24.04
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
     
@@ -31,12 +31,18 @@ jobs:
     runs-on: ubuntu-24.04
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
+    
+    - name: Install Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.41.4'
+        channel: 'stable'
     
     - name: Install dependencies
       run: |
@@ -45,7 +51,7 @@ jobs:
     
     - name: Build Linux
       run: |
-        flet build linux
+        flet build linux --yes
     
     - name: Upload Linux build
       uses: actions/upload-artifact@v4
@@ -58,10 +64,10 @@ jobs:
     runs-on: ubuntu-24.04
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
     
@@ -71,15 +77,26 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     
+    - name: Install Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.41.4'
+        channel: 'stable'
+    
     - name: Install dependencies
       run: |
         pip install --break-system-packages -r requirements.txt
         pip install --break-system-packages flet-cli
         sudo apt-get update && sudo apt-get install -y cmake ninja-build
     
+    - name: Enable Android
+      run: |
+        flutter config --enable-linux-desktop
+        flutter precache --android
+    
     - name: Build Android APK
       run: |
-        flet build apk
+        flet build apk --yes
     
     - name: Upload Android build
       uses: actions/upload-artifact@v4
