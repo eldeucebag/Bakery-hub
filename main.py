@@ -6,6 +6,7 @@ Targets: Linux and Android
 """
 
 import time
+import traceback
 from datetime import datetime
 import RNS
 import flet as ft
@@ -151,10 +152,10 @@ class ReticulumApp:
             self.page.update()
 
             destination_hash = bytes.fromhex(HUB_DESTINATION_HASH)
-            
+
             if not RNS.Transport.has_path(destination_hash):
                 RNS.Transport.request_path(destination_hash)
-                
+
                 # Wait for path with timeout
                 timeout = 30  # seconds
                 start_time = time.time()
@@ -169,7 +170,7 @@ class ReticulumApp:
 
             # Recall the hub identity
             hub_identity = RNS.Identity.recall(destination_hash)
-            
+
             if hub_identity is None:
                 raise ValueError("Could not recall hub identity")
 
@@ -201,7 +202,10 @@ class ReticulumApp:
                 raise TimeoutError("Link establishment timed out")
 
         except Exception as e:
-            self.update_status(f"Connection error: {str(e)}", ft.Colors.RED)
+            error_msg = f"Connection error: {str(e)}"
+            print(error_msg)
+            print(traceback.format_exc())
+            self.update_status(error_msg, ft.Colors.RED)
             self.connected = False
             self.page.update()
 
@@ -209,15 +213,16 @@ class ReticulumApp:
         """Callback when link is established"""
         try:
             self.connected = True
-            
+
             self.update_status("Connected to hub!", ft.Colors.GREEN)
-            
+            self.page.update()
+
             if self.connect_btn:
                 self.connect_btn.text = "Disconnect"
                 self.connect_btn.icon = ft.icons.WIFI_OFF
                 self.connect_btn.bgcolor = ft.Colors.RED_200
                 self.connect_btn.update()
-            
+
             if self.refresh_btn:
                 self.refresh_btn.disabled = False
                 self.refresh_btn.update()
@@ -226,7 +231,10 @@ class ReticulumApp:
             self.load_page("/page/index.mu")
 
         except Exception as e:
-            self.update_status(f"Link error: {str(e)}", ft.Colors.RED)
+            error_msg = f"Link error: {str(e)}"
+            print(error_msg)
+            print(traceback.format_exc())
+            self.update_status(error_msg, ft.Colors.RED)
             self.page.update()
 
     def link_closed(self, link):
@@ -387,18 +395,17 @@ def main(page: ft.Page):
     page.padding = 15
     page.spacing = 15
     page.theme_mode = ft.ThemeMode.LIGHT
-
-    # Set window size for desktop
-    page.window_width = 900
-    page.window_height = 700
+    page.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
 
     # Add the main app
-    app = ReticulumApp(page)
-    page.add(app.get_ui())
-
-    # Auto-connect on start
-    page.run_task(lambda _: app.connect())
+    try:
+        app = ReticulumApp(page)
+        page.add(app.get_ui())
+    except Exception as e:
+        print(f"Error initializing app: {e}")
+        print(traceback.format_exc())
+        page.add(ft.Text(f"Error: {e}", color=ft.Colors.RED))
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(target=main, view=ft.AppView.FLET_APP)
