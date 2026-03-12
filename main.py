@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Reticulum Flet App - Community Server Announce Viewer
-Connects to a specific community server and displays received announces.
+Reticulum Flet App - Community Hub Browser
+Connects to the community hub via RNS and displays micron pages.
 Targets: Linux and Android
 """
 
@@ -10,47 +10,13 @@ from datetime import datetime
 import RNS
 import flet as ft
 
-# Community server identity hash and port
-COMMUNITY_SERVER_HASH = "99b91c274bd7c2b926426618a3c2dbbd480cae10eadf9d53aabb873d2bbbbb71"
-COMMUNITY_SERVER_PORT = 4242
-
-
-class AnnounceCard(ft.Card):
-    """Card widget to display a single announce"""
-
-    def __init__(self, announce_data, **kwargs):
-        super().__init__(**kwargs)
-        self.elevation = 2
-        self.margin = 5
-
-        self.content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Row([
-                        ft.Icon(ft.icons.RADIO, size=16, color=ft.Colors.GREEN),
-                        ft.Text(
-                            f"Source: {announce_data['source']}",
-                            weight=ft.FontWeight.BOLD,
-                            size=14,
-                        ),
-                    ]),
-                    ft.Divider(height=5),
-                    ft.Text(
-                        f"Data: {announce_data['data']}",
-                        size=12,
-                        selectable=True,
-                    ),
-                    ft.Text(
-                        f"Time: {announce_data['time']}",
-                        size=10,
-                        color=ft.Colors.GREY_600,
-                        italic=True,
-                    ),
-                ],
-                spacing=3,
-            ),
-            padding=10,
-        )
+# Community Hub identity hash (Yggdrasil address)
+HUB_IDENTITY_HASH = "56c4f7b24c4d6e0380871c06533352666da9312d7bc9fa3b0bfeaeb4a49465e1"
+# RNS Destination Hash for the hub's page service
+HUB_DESTINATION_HASH = "f97f412b9ef6d1c2330ca5ee28ee9e31"
+# App naming for the destination
+APP_NAME = "nomadnet"
+APP_INSTANCE = "page"
 
 
 class ReticulumApp:
@@ -60,11 +26,16 @@ class ReticulumApp:
         self.page = page
         self.rns = None
         self.destination = None
-        self.announce_list = []
+        self.link = None
         self.connected = False
-        self.announces_list = None
+        self.current_page_content = None
+        self.page_title = "Community Hub"
+        
+        # UI components
         self.status_text = None
         self.connect_btn = None
+        self.refresh_btn = None
+        self.content_display = None
 
     def get_ui(self):
         """Get the main UI column"""
@@ -84,23 +55,37 @@ class ReticulumApp:
 
         # Connection info
         conn_info = ft.Text(
-            f"Server: {COMMUNITY_SERVER_HASH[:32]}...:{COMMUNITY_SERVER_PORT}",
+            f"Hub: {HUB_IDENTITY_HASH[:32]}...",
             size=11,
             color=ft.Colors.GREY_700,
         )
 
-        # Announces list
-        self.announces_list = ft.ListView(
-            spacing=5,
+        # Page title
+        self.title_text = ft.Text(
+            self.page_title,
+            size=18,
+            weight=ft.FontWeight.BOLD,
+        )
+
+        # Content display area
+        self.content_display = ft.Container(
+            content=ft.Text(
+                "Connect to the hub to load the index page...",
+                size=14,
+                color=ft.Colors.GREY_600,
+            ),
+            padding=15,
             expand=True,
-            auto_scroll=True,
+            border=ft.border.all(1, ft.Colors.GREY_400),
+            border_radius=5,
         )
 
         # Buttons row
-        clear_btn = ft.ElevatedButton(
-            "Clear",
-            icon=ft.icons.DELETE_SWEEP,
-            on_click=self.clear_announces,
+        self.refresh_btn = ft.ElevatedButton(
+            "Refresh",
+            icon=ft.icons.REFRESH,
+            on_click=self.refresh_page,
+            disabled=True,
         )
 
         self.connect_btn = ft.ElevatedButton(
@@ -110,7 +95,7 @@ class ReticulumApp:
         )
 
         button_row = ft.Row(
-            controls=[clear_btn, self.connect_btn],
+            controls=[self.refresh_btn, self.connect_btn],
             alignment=ft.MainAxisAlignment.SPACE_EVENLY,
         )
 
@@ -120,15 +105,11 @@ class ReticulumApp:
                 self.status_bar,
                 conn_info,
                 ft.Divider(height=10),
-                ft.Row([
-                    ft.Icon(ft.icons.ANNOUNCEMENT, size=20),
-                    ft.Text("Received Announces:", weight=ft.FontWeight.BOLD),
-                ]),
+                self.title_text,
+                ft.Divider(height=5),
                 ft.Container(
-                    content=self.announces_list,
+                    content=self.content_display,
                     expand=True,
-                    border=ft.border.all(1, ft.Colors.GREY_400),
-                    border_radius=5,
                 ),
                 button_row,
             ],
@@ -143,128 +124,273 @@ class ReticulumApp:
             self.status_text.color = color
             self.status_bar.update()
 
-    def add_announce(self, announce_data):
-        """Add a new announce to the list"""
-        if self.announces_list:
-            card = AnnounceCard(announce_data)
-            self.announces_list.controls.append(card)
-            self.announces_list.update()
-
-    def clear_announces(self, e):
-        """Clear all displayed announces"""
-        if self.announces_list:
-            self.announces_list.controls.clear()
-            self.announce_list = []
-            self.announces_list.update()
-        self.update_status("Announces cleared", ft.Colors.GREEN)
-
     def toggle_connection(self, e):
-        """Toggle connection to server"""
+        """Toggle connection to hub"""
         if self.connected:
             self.disconnect()
         else:
             self.connect()
 
     def connect(self):
-        """Connect to the community server"""
+        """Connect to the community hub"""
         try:
             self.update_status("Initializing Reticulum...", ft.Colors.BLUE)
+            self.page.update()
 
             # Initialize RNS
             self.rns = RNS.Reticulum()
 
             self.update_status("Reticulum initialized", ft.Colors.GREEN)
+            self.page.update()
 
-            # Create an identity for this destination
-            identity = RNS.Identity()
+            # Create an identity for this client
+            self.client_identity = RNS.Identity()
 
-            # Create a destination for receiving announces
+            # Check if we have a path to the destination
+            self.update_status("Requesting path to hub...", ft.Colors.BLUE)
+            self.page.update()
+
+            destination_hash = bytes.fromhex(HUB_DESTINATION_HASH)
+            
+            if not RNS.Transport.has_path(destination_hash):
+                RNS.Transport.request_path(destination_hash)
+                
+                # Wait for path with timeout
+                timeout = 30  # seconds
+                start_time = time.time()
+                while not RNS.Transport.has_path(destination_hash):
+                    if time.time() - start_time > timeout:
+                        raise TimeoutError(f"Path request timed out after {timeout} seconds")
+                    time.sleep(0.5)
+                    self.page.update()
+
+            self.update_status("Path received, recalling identity...", ft.Colors.GREEN)
+            self.page.update()
+
+            # Recall the hub identity
+            hub_identity = RNS.Identity.recall(destination_hash)
+            
+            if hub_identity is None:
+                raise ValueError("Could not recall hub identity")
+
+            # Create destination for the hub's page service
             self.destination = RNS.Destination(
-                identity,
-                RNS.Destination.IN,
+                hub_identity,
+                RNS.Destination.OUT,
                 RNS.Destination.SINGLE,
-                "reticulum",
-                "community",
-                "viewer"
+                APP_NAME,
+                APP_INSTANCE
             )
 
-            # Register announce handler globally
-            RNS.Transport.register_announce_handler(self.handle_announce)
+            self.update_status("Creating link to hub...", ft.Colors.BLUE)
+            self.page.update()
 
+            # Create link to the hub
+            self.link = RNS.Link(self.destination)
+            self.link.set_link_established_callback(self.link_established)
+            self.link.set_link_closed_callback(self.link_closed)
+
+            # Wait for link establishment with timeout
+            timeout = 30
+            start_time = time.time()
+            while not self.connected and time.time() - start_time < timeout:
+                time.sleep(0.1)
+                self.page.update()
+
+            if not self.connected:
+                raise TimeoutError("Link establishment timed out")
+
+        except Exception as e:
+            self.update_status(f"Connection error: {str(e)}", ft.Colors.RED)
+            self.connected = False
+            self.page.update()
+
+    def link_established(self, link):
+        """Callback when link is established"""
+        try:
             self.connected = True
+            
+            self.update_status("Connected to hub!", ft.Colors.GREEN)
+            
             if self.connect_btn:
                 self.connect_btn.text = "Disconnect"
                 self.connect_btn.icon = ft.icons.WIFI_OFF
                 self.connect_btn.bgcolor = ft.Colors.RED_200
                 self.connect_btn.update()
+            
+            if self.refresh_btn:
+                self.refresh_btn.disabled = False
+                self.refresh_btn.update()
 
-            self.update_status(f"Connected to {COMMUNITY_SERVER_HASH[:16]}...", ft.Colors.GREEN)
-
-            # Announces will be received automatically via the handler
+            # Load the index page
+            self.load_page("/page/index.mu")
 
         except Exception as e:
-            self.update_status(f"Connection error: {str(e)}", ft.Colors.RED)
-            self.connected = False
+            self.update_status(f"Link error: {str(e)}", ft.Colors.RED)
+            self.page.update()
+
+    def link_closed(self, link):
+        """Callback when link is closed"""
+        self.connected = False
+        self.link = None
+        
+        if self.connect_btn:
+            self.connect_btn.text = "Connect"
+            self.connect_btn.icon = ft.icons.WIFI
+            self.connect_btn.bgcolor = None
+            self.connect_btn.update()
+        
+        if self.refresh_btn:
+            self.refresh_btn.disabled = True
+            self.refresh_btn.update()
+
+        self.update_status("Disconnected", ft.Colors.ORANGE)
+        self.page.update()
 
     def disconnect(self):
-        """Disconnect from the server"""
+        """Disconnect from the hub"""
         try:
-            # Deregister announce handler
-            RNS.Transport.deregister_announce_handler(self.handle_announce)
-
+            if self.link:
+                self.link.teardown()
+            
             self.connected = False
+            self.link = None
+            
             if self.connect_btn:
                 self.connect_btn.text = "Connect"
                 self.connect_btn.icon = ft.icons.WIFI
                 self.connect_btn.bgcolor = None
                 self.connect_btn.update()
 
+            if self.refresh_btn:
+                self.refresh_btn.disabled = True
+                self.refresh_btn.update()
+
             self.update_status("Disconnected", ft.Colors.ORANGE)
+            self.page.update()
 
         except Exception as e:
             self.update_status(f"Disconnect error: {str(e)}", ft.Colors.RED)
 
-    def handle_announce(self, path, data, request_id, requested_by, interface_id=None):
-        """Handle received announces"""
+    def load_page(self, path):
+        """Request and load a micron page from the hub"""
         try:
-            # Get source identity
-            source = "Unknown"
-            if path:
-                source = path[:32] + "..."
+            if not self.link or not self.connected:
+                self.update_status("Not connected to hub", ft.Colors.RED)
+                return
 
-            # Decode data if present
-            data_str = ""
-            if data:
-                try:
-                    data_str = data.decode('utf-8')
-                except:
-                    data_str = data.hex()[:64] + "..."
+            self.update_status(f"Loading {path}...", ft.Colors.BLUE)
+            self.page.update()
 
-            announce_data = {
-                'source': source,
-                'data': data_str if data_str else "(no data)",
-                'time': datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-            }
-
-            self.announce_list.append(announce_data)
-
-            # Update UI on main thread
-            self.page.run_task(lambda _: self.add_announce(announce_data))
+            # Make a request for the page content
+            self.link.request(
+                path,
+                data=None,
+                response_callback=self.page_response,
+                failed_callback=self.page_request_failed
+            )
 
         except Exception as e:
-            print(f"Error handling announce: {e}")
+            self.update_status(f"Page load error: {str(e)}", ft.Colors.RED)
+            self.page.update()
+
+    def page_response(self, request_receipt):
+        """Handle page response from hub"""
+        try:
+            request_id = request_receipt.request_id
+            response = request_receipt.response
+
+            if response:
+                # Decode the response
+                try:
+                    page_content = response.decode('utf-8')
+                except:
+                    page_content = response.hex()
+
+                self.current_page_content = page_content
+                
+                # Update UI on main thread
+                self.page.run_task(self.display_page_content, page_content)
+                
+                self.update_status("Page loaded successfully", ft.Colors.GREEN)
+            else:
+                self.update_status("Empty response from hub", ft.Colors.ORANGE)
+
+        except Exception as e:
+            self.update_status(f"Response error: {str(e)}", ft.Colors.RED)
+            self.page.update()
+
+    def page_request_failed(self, request_receipt):
+        """Handle failed page request"""
+        request_id = request_receipt.request_id
+        self.update_status(f"Page request failed: {RNS.prettyhexrep(request_id)}", ft.Colors.RED)
+        self.page.update()
+
+    def display_page_content(self, content):
+        """Display the page content in the UI"""
+        if self.content_display:
+            # Simple micron markup rendering
+            rendered = self.render_micron(content)
+            
+            self.content_display.content = ft.Text(
+                rendered,
+                size=14,
+                selectable=True,
+            )
+            self.content_display.update()
+
+    def render_micron(self, content):
+        """Simple micron markup renderer"""
+        lines = content.split('\n')
+        rendered_lines = []
+        
+        for line in lines:
+            # Handle headings
+            if line.startswith('# '):
+                rendered_lines.append(f"══ {line[2:]} ══")
+            elif line.startswith('## '):
+                rendered_lines.append(f"─ {line[3:]} ─")
+            elif line.startswith('### '):
+                rendered_lines.append(line[4:])
+            # Handle links
+            elif line.startswith('[') and '](' in line:
+                # Simple link display
+                import re
+                link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', line)
+                if link_match:
+                    text, url = link_match.groups()
+                    rendered_lines.append(f"→ {text} [{url}]")
+                else:
+                    rendered_lines.append(line)
+            # Handle bullet points
+            elif line.startswith('- '):
+                rendered_lines.append(f"• {line[2:]}")
+            # Handle code blocks (simple handling)
+            elif line.startswith('    '):
+                rendered_lines.append(f"  {line[4:]}")
+            else:
+                rendered_lines.append(line)
+        
+        return '\n'.join(rendered_lines)
+
+    def refresh_page(self, e):
+        """Refresh the current page"""
+        if self.current_page_content:
+            self.load_page("/page/index.mu")
+        else:
+            self.load_page("/page/index.mu")
 
 
 def main(page: ft.Page):
     """Main Flet app entry point"""
-    page.title = "Reticulum Community Viewer"
+    page.title = "Community Hub Browser"
     page.padding = 15
     page.spacing = 15
     page.theme_mode = ft.ThemeMode.LIGHT
 
     # Set window size for desktop
-    page.window_width = 800
-    page.window_height = 600
+    page.window_width = 900
+    page.window_height = 700
 
     # Add the main app
     app = ReticulumApp(page)

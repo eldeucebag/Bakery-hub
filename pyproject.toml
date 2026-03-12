@@ -1,7 +1,7 @@
 [project]
-name = "reticulum-viewer"
-version = "1.0.0"
-description = "A Reticulum community server announce viewer."
+name = "reticulum-hub-browser"
+version = "1.0.1"
+description = "A Reticulum community hub browser for nomadnet micron pages."
 authors = [
     {name = "eldeucebag"}
 ]
