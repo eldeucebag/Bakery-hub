@@ -115,6 +115,13 @@ class ReticulumApp:
             self.page.update()
 
             import RNS
+            
+            # Configure RNS storage path for Android
+            if sys.platform == "android":
+                storage_path = "/sdcard/Android/data/reticulum_hub_browser/.reticulum"
+                log(f"Setting RNS storage to: {storage_path}")
+                RNS.Reticulum.configure(storagepath=storage_path)
+            
             log("RNS imported")
             self.rns = RNS.Reticulum()
             log("RNS initialized")
