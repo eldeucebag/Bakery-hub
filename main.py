@@ -119,14 +119,18 @@ class ReticulumApp:
                 storage_path = "/sdcard/Android/data/reticulum_hub_browser/.reticulum"
                 log(f"Creating storage path: {storage_path}")
                 Path(storage_path).mkdir(parents=True, exist_ok=True)
-                # Set environment variable for RNS
-                import os
-                os.environ["RNS_STORAGE"] = storage_path
-                log(f"Set RNS_STORAGE env to: {storage_path}")
+            else:
+                storage_path = None
             
             import RNS
             log("RNS imported")
-            self.rns = RNS.Reticulum()
+            
+            # Pass configdir to Reticulum init
+            if storage_path:
+                log(f"Initializing RNS with configdir: {storage_path}")
+                self.rns = RNS.Reticulum(configdir=storage_path)
+            else:
+                self.rns = RNS.Reticulum()
             log("RNS initialized")
 
             self.update_status("Reticulum initialized", "green")
