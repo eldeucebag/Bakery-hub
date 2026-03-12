@@ -115,13 +115,12 @@ class ReticulumApp:
             self.page.update()
 
             # Setup writable storage path BEFORE importing RNS
-            # Try multiple paths for Android compatibility
+            # Use the actual Android package name: com.flet.reticulum_hub_browser
             if sys.platform == "android":
-                # Try app's internal storage first
-                storage_path = "/storage/emulated/0/Android/data/org.flet.retikulum_hub_browser/.reticulum"
+                storage_path = "/storage/emulated/0/Android/data/com.flet.reticulum_hub_browser/.reticulum"
                 log(f"Trying storage path: {storage_path}")
                 
-                # Fallback to Downloads folder
+                # Check if path exists, fallback to Downloads
                 if not Path(storage_path).parent.exists():
                     storage_path = "/storage/emulated/0/Download/.reticulum"
                     log(f"Fallback to: {storage_path}")
