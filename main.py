@@ -16,9 +16,25 @@ from pathlib import Path
 import flet as ft
 
 # Setup logging to file and console
-LOG_DIR = Path.home() / ".reticulum_hub_browser"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / "app.log"
+# Use writable locations for Android compatibility
+if sys.platform == "android":
+    # On Android, use the app's internal files directory
+    LOG_DIR = Path("/sdcard/Android/data") / "reticulum_hub_browser" / "logs"
+elif sys.platform == "darwin":
+    LOG_DIR = Path.home() / "Library" / "Logs" / "reticulum_hub_browser"
+else:
+    # Linux/other
+    LOG_DIR = Path.home() / ".reticulum_hub_browser" / "logs"
+
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = LOG_DIR / "app.log"
+except PermissionError as e:
+    # Fallback to temp directory if permission denied
+    import tempfile
+    LOG_DIR = Path(tempfile.gettempdir()) / "reticulum_hub_browser"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = LOG_DIR / "app.log"
 
 logging.basicConfig(
     level=logging.DEBUG,
